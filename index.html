@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Продвинутый генератор картины</title>
+<style>
+  body {
+    background: #222;
+    color: #eee;
+    font-family: Arial, sans-serif;
+    text-align: center;
+    padding: 20px;
+  }
+  canvas {
+    background: #fff;
+    border: 2px solid #555;
+    margin-top: 20px;
+    border-radius: 8px;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  label {
+    margin: 0 10px;
+  }
+  input, select {
+    margin-left: 5px;
+  }
+  button {
+    margin-top: 15px;
+    padding: 10px 20px;
+    font-size: 18px;
+    border: none;
+    border-radius: 6px;
+    background: #007bff;
+    color: white;
+    cursor: pointer;
+  }
+  button:hover {
+    background: #0056b3;
+  }
+  #buttons {
+    margin-top: 10px;
+  }
+  #status {
+    margin-top: 15px;
+    font-size: 16px;
+    color: #ccc;
+  }
+</style>
+</head>
+<body>
+
+<h1>Продвинутый генератор абстрактной картины</h1>
+
+<div>
+  <label>Тип фигур:
+    <select id="shapeType">
+      <option value="circle">Круги</option>
+      <option value="rect">Прямоугольники</option>
+      <option value="line">Линии</option>
+      <option value="mixed">Смешанные</option>
+    </select>
+  </label>
+
+  <label>Количество (5-100):
+    <input type="number" id="shapeCount" value="50" min="5" max="100" />
+  </label>
+
+  <label>Прозрачность:
+    <input type="range" id="opacity" min="0.1" max="1" step="0.05" value="0.6" />
+  </label>
+
+  <label>Палитра:
+    <select id="palette">
+      <option value="random">Случайные цвета</option>
+      <option value="pastel">Пастельные</option>
+      <option value="warm">Тёплые</option>
+      <option value="cool">Холодные</option>
+      <option value="grayscale">Оттенки серого</option>
+    </select>
+  </label>
+</div>
+
+<div id="buttons">
+  <button id="generateBtn">Сгенерировать с анимацией</button>
+  <button id="saveBtn">Сохранить картину</button>
+</div>
+
+<div id="status"></div>
+
+<canvas id="artCanvas" width="700" height="500"></canvas>
+
+<script>
+  const canvas = document.getElementById('artCanvas');
+  const ctx = canvas.getContext('2d');
+
+  const shapeType = document.getElementById('shapeType');
+  const shapeCount = document.getElementById('shapeCount');
+  const opacity = document.getElementById('opacity');
+  const paletteSelect = document.getElementById('palette');
+  const generateBtn = document.getElementById('generateBtn');
+  const saveBtn = document.getElementById('saveBtn');
+  const status = document.getElementById('status');
+
+  // Ограничение ввода количества фигур
+  shapeCount.addEventListener('input', () => {
+    if (shapeCount.value > 100) shapeCount.value = 100;
+    if (shapeCount.value < 5) shapeCount.value = 5;
+  });
+
+  // Палитры цветов
+  const palettes = {
+    random: () => {
+      const r = Math.floor(Math.random() * 256);
+      const g = Math.floor(Math.random() * 256);
+      const b = Math.floor(Math.random() * 256);
+      return [r, g, b];
+    },
+    pastel: () => {
+      const r = 150 + Math.floor(Math.random() * 106);
+      const g = 150 + Math.floor(Math.random() * 106);
+      const b = 150 + Math.floor(Math.random() * 106);
+      return [r, g, b];
+    },
+    warm: () => {
+      const r = 180 + Math.floor(Math.random() * 75);
+      const g = Math.floor(Math.random() * 100);
+      const b = Math.floor(Math.random() * 50);
+      return [r, g, b];
+    },
+    cool: () => {
+      const r = Math.floor(Math.random() * 50);
+      const g = Math.floor(Math.random() * 150);
+      const b = 150 + Math.floor(Math.random() * 100);
+      return [r, g, b];
+    },
+    grayscale: () => {
+      const v = Math.floor(Math.random() * 256);
+      return [v, v, v];
+    }
+  };
+
+  // Функция для получения цвета из палитры с opacity
+  function getColor(opacityValue) {
+    const pal = palettes[paletteSelect.value];
+    if (!pal) return `rgba(0,0,0,${opacityValue})`;
+    const [r, g, b] = pal();
+    return `rgba(${r},${g},${b},${opacityValue})`;
+  }
+
+  // Отрисовка фигур с эффектами (градиент + тень)
+  function drawCircle(x, y, radius, color) {
+    const grad = ctx.createRadialGradient(x, y, radius*0.3, x, y, radius);
+    grad.addColorStop(0, 'white');
+    grad.addColorStop(1, color);
+
+    ctx.shadowColor = 'rgba(0,0,0,0.3)';
+    ctx.shadowBlur = 10;
+
+    ctx.beginPath();
+    ctx.fillStyle = grad;
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.shadowBlur = 0;
+  }
+
+  function drawRect(x, y, w, h, color) {
+    const grad = ctx.createLinearGradient(x, y, x + w, y + h);
+    grad.addColorStop(0, color);
+    grad.addColorStop(1, 'white');
+
+    ctx.shadowColor = 'rgba(0,0,0,0.3)';
+    ctx.shadowBlur = 10;
+
+    ctx.fillStyle = grad;
+    ctx.fillRect(x, y, w, h);
+
+    ctx.shadowBlur = 0;
+  }
+
+  function drawLine(x1, y1, x2, y2, color, width) {
+    const grad = ctx.createLinearGradient(x1, y1, x2, y2);
+    grad.addColorStop(0, color);
+    grad.addColorStop(1, 'white');
+
+    ctx.shadowColor = 'rgba(0,0,0,0.3)';
+    ctx.shadowBlur = 5;
+
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = width;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+
+    ctx.shadowBlur = 0;
+  }
+
+  // Анимация появления фигур
+  let shapes = [];
+  let animationFrameId;
+
+  function prepareShapes() {
+    shapes = [];
+    const count = parseInt(shapeCount.value);
+    const alpha = parseFloat(opacity.value);
+    const type = shapeType.value;
+
+    for(let i = 0; i < count; i++) {
+      const x = Math.random() * canvas.width;
+      const y = Math.random() * canvas.height;
+      const color = getColor(alpha);
+
+      let shapeTypeCurrent = type;
+      if (type === 'mixed') {
+        const r = Math.random();
+        if (r < 0.33) shapeTypeCurrent = 'circle';
+        else if (r < 0.66) shapeTypeCurrent = 'rect';
+        else shapeTypeCurrent = 'line';
+      }
+
+      let shape = { type: shapeTypeCurrent, x, y, color, progress: 0 };
+
+      if(shapeTypeCurrent === 'circle') {
+        shape.radius = 10 + Math.random() * 50;
+      } else if(shapeTypeCurrent === 'rect') {
+        shape.w = 20 + Math.random() * 80;
+        shape.h = 20 + Math.random() * 80;
+      } else {
+        shape.x2 = x + (Math.random() - 0.5) * 200;
+        shape.y2 = y + (Math.random() - 0.5) * 200;
+        shape.width = 1 + Math.random() * 4;
+      }
+
+      shapes.push(shape);
+    }
+  }
+
+  function animateShapes() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    let allDone = true;
+
+    shapes.forEach(shape => {
+      if (shape.progress < 1) {
+        shape.progress += 0.02; // скорость появления
+        if(shape.progress > 1) shape.progress = 1;
+        allDone = false;
+      }
+
+      const alpha = shape.progress;
+
+      if(shape.type === 'circle') {
+        drawCircle(shape.x, shape.y, shape.radius * alpha, shape.color.replace(/[\d\.]+\)$/,'') + alpha + ')');
+      } else if(shape.type === 'rect') {
+        drawRect(shape.x, shape.y, shape.w * alpha, shape.h * alpha, shape.color.replace(/[\d\.]+\)$/,'') + alpha + ')');
+      } else if(shape.type === 'line') {
+        const x2 = shape.x + (shape.x2 - shape.x) * alpha;
+        const y2 = shape.y + (shape.y2 - shape.y) * alpha;
+        ctx.globalAlpha = alpha;
+        drawLine(shape.x, shape.y, x2, y2, shape.color, shape.width);
+        ctx.globalAlpha = 1;
+      }
+    });
+
+    if(!allDone) {
+      animationFrameId = requestAnimationFrame(animateShapes);
+      status.textContent = 'Анимация в процессе...';
+      generateBtn.disabled = true;
+      saveBtn.disabled = true;
+    } else {
+      status.textContent = 'Анимация завершена. Можно сохранить картину.';
+      generateBtn.disabled = false;
+      saveBtn.disabled = false;
+      cancelAnimationFrame(animationFrameId);
+    }
+  }
+
+  generateBtn.addEventListener('click', () => {
+    prepareShapes();
+    animateShapes();
+  });
+
+  saveBtn.addEventListener('click', () => {
+    // Останавливаем анимацию, если идет
+    cancelAnimationFrame(animationFrameId);
+
+    const link = document.createElement('a');
+    link.download = 'abstract-art.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  });
+
+  // Старт при загрузке
+  prepareShapes();
+  animateShapes();
+</script>
+
+</body>
+</html>
+ыы
